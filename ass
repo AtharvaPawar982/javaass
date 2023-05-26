@@ -1,0 +1,375 @@
+############### RMI ASS1 ######################
+
+1. circleInterface.java
+
+import java.rmi.*;
+public interface circleInterface extends Remote{
+public double area(int radius) throws RemoteException;
+public double perimeter(int radius) throws RemoteException;
+}
+
+2. circleImpl.java
+
+import java.rmi.*;
+import java.rmi.server.*;
+@SuppressWarnings("serial")
+public class circleImpl extends UnicastRemoteObject implements circleInterface{
+public circleImpl() throws RemoteException {
+super();
+}
+public double area(int radius) throws RemoteException {
+double pi=3.14;
+return pi*radius*radius;
+}
+public double perimeter(int radius) throws RemoteException {
+double pi=3.14;
+return 2*pi*radius;
+}
+}
+
+3. Server.java
+
+import java.rmi.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
+public class Server{
+public Server() throws RemoteException {
+super();
+}
+public static void main(String args[]) throws RemoteException {
+Registry reg=LocateRegistry.createRegistry (101);
+circleImpl ci=new circleImpl();
+reg.rebind("circle", ci);
+System.out.println("Server is waiting....");
+}}
+
+4. Client.java
+
+import java.net.MalformedURLException;
+import java.rmi.*;
+import java.util.Scanner;
+public class Client{
+public Client(){
+}
+public static void main(String args[]) throws RemoteException, MalformedURLException, 
+NotBoundException{
+int radius;
+@SuppressWarnings("resource")
+Scanner in=new Scanner(System.in);
+System.out.println("Enter the radius of the circle");
+radius=in.nextInt();
+circleInterface c=(circleInterface) Naming.lookup("rmi://localhost:101/circle"); 
+System.out.println("The area of the circle is "+c. area(radius)); 
+System.out.println("The perimeter of the circle is "+c.perimeter(radius));
+}
+}
+
+####################### Distributed sum ass-3 #######################
+
+// commands
+
+javac -cp .;%MPJ_HOME%/lib/mpj.jar DistributedSum.java
+
+mpjrun.bat -np 2 DistributedSum
+
+//Code 
+
+import mpi.*;
+public class DistributedSum {
+public static void main(String[] args) throws MPIException {
+MPI.Init(args);
+
+int rank = MPI.COMM_WORLD.Rank();
+int size = MPI.COMM_WORLD.Size();
+int[] array = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}; // Input array
+int n = array.length;
+int localN = n / size; // Number of elements per processor
+int[] localArray = new int[localN]; // Local array for each processor
+int localSum = 0; // Local sum for each processor
+int totalSum = 0;
+
+// Scatter the input array to all processors
+MPI.COMM_WORLD.Scatter(array, 0, localN, MPI.INT, localArray, 0, localN, MPI.INT, 0);
+
+// Calculate the local sum for each processor
+for (int i = 0; i < localN; i++) {
+localSum += localArray[i];
+
+}
+
+// Send the local sum to the master processor
+int[] globalSum = new int[1];
+MPI.COMM_WORLD.Reduce(new int[] {localSum}, 0, globalSum, 0, 1, MPI.INT,
+MPI.SUM, 0);
+
+// Display the intermediate sums calculated by each processor
+System.out.println("Processor " + rank + " calculated sum = " + localSum);
+if (rank == 0) {
+totalSum = globalSum[0];
+System.out.println("Total Sum = " + totalSum);
+}
+
+MPI.Finalize();
+}
+}
+
+###################### Berkley ass 4 ###############################
+
+// package ds4;
+import java.util.*;
+public class Main {
+ public static void main(String[] args) {
+ Scanner sc = new Scanner(System.in);
+ // Set up the system clocks in terms of hours and minutes
+ ArrayList<String> systemClocks = new ArrayList<>();
+ systemClocks.add("03:00");
+ systemClocks.add("02:50");
+ systemClocks.add("03:25");
+ System.out.println("System clocks: " + systemClocks);
+ // Calculate the master clock
+ System.out.println("Enter master Clock: ");
+ String masterClock = sc.next();
+ System.out.println("Master clock: " + masterClock);
+ // Calculate the clock offsets
+ ArrayList<Integer> clockOffsets = new ArrayList<>();
+ for (String clock : systemClocks) {
+ int offset = timeToMinutes(clock) - timeToMinutes(masterClock);
+ clockOffsets.add(offset);
+ }
+ System.out.println("Clock offsets (in minutes): " + clockOffsets);
+ // Calculate the average clock offset
+ int totalOffset = 0;
+ for (int offset : clockOffsets) {
+ totalOffset += offset;
+ }
+ int averageOffset = totalOffset / clockOffsets.size();
+ System.out.println("Average clock offset (in minutes): " + averageOffset);
+ int Tcorr = timeToMinutes(masterClock) + averageOffset;
+ // Adjust the client offset
+ ArrayList<Integer> sentOffset = new ArrayList<>();
+ for (String clock : systemClocks) {
+ int adjustedMinutes = Tcorr - timeToMinutes(clock);
+ sentOffset.add(adjustedMinutes);
+ }
+ System.out.println("Sent clock offset : " + sentOffset);
+ // Adjust the client clocks
+ ArrayList<String> adjustedClocks = new ArrayList<>();
+ for(int i=0;i<systemClocks.size();i++){
+ int adj = timeToMinutes(systemClocks.get(i)) + sentOffset.get(i);
+ adjustedClocks.add(minutesToTime(adj));
+ }
+ System.out.println("Adjusted system clocks: " + adjustedClocks);
+ }
+ // Helper function to convert a time string in "hh:mm" format to minutes
+ private static int timeToMinutes(String time) {
+ String[] parts = time.split(":");
+ int hours = Integer.parseInt(parts[0]);
+ int minutes = Integer.parseInt(parts[1]);
+ return hours * 60 + minutes;
+ }
+ // Helper function to convert minutes to a time string in "hh:mm" format
+ private static String minutesToTime(int minutes) {
+ int hours = minutes / 60;
+ int remainingMinutes = minutes % 60;
+ return String.format("%02d:%02d", hours, remainingMinutes);
+ }
+}
+
+##################### tokenRing Ass 5 ###############################
+
+import java.util.concurrent.Semaphore;
+public class ds {
+static int numProcesses = 5;
+static Semaphore[] semaphores = new Semaphore[numProcesses];
+static boolean[] isHoldingToken = new boolean[numProcesses];
+static int nextProcess = 0;
+public static void main(String[] args) throws InterruptedException {
+// Initialize semaphores
+for (int i = 0; i < numProcesses; i++) {
+semaphores[i] = new Semaphore(0);
+isHoldingToken[i] = false;
+}
+isHoldingToken[0] = true; // The first process initially holds the token
+// Start the processes
+Thread[] threads = new Thread[numProcesses];
+for (int i = 0; i < numProcesses; i++) {
+int id = i;
+threads[i] = new Thread(() -> {
+while (true) {
+try {
+semaphores[id].acquire(); // Wait for permission to enter critical section
+criticalSection(id);
+releaseToken(id);
+} catch (InterruptedException e) {
+e.printStackTrace();
+}
+}
+});
+threads[i].start();
+}
+// Start the token passing loop
+while (true) {
+Thread.sleep(1000); // Wait for some time
+int currentProcess = nextProcess;
+
+nextProcess = (nextProcess + 1) % numProcesses; // Pass the token to the next process
+if (isHoldingToken[currentProcess]) {
+semaphores[nextProcess].release(); // Signal the next process to enter critical section
+}
+}
+}
+static void criticalSection(int id) {
+System.out.println("Process " + id + " entered critical section");
+try {
+Thread.sleep(1000); // Simulate some work
+} catch (InterruptedException e) {
+e.printStackTrace();
+}
+System.out.println("Process " + id + " exited critical section");
+}
+static void releaseToken(int id) {
+isHoldingToken[id] = false;
+isHoldingToken[nextProcess] = true;
+}
+}
+
+####################### BULLY ALGO #####################
+
+import java.util.ArrayList;
+import java.util.List;
+public class BullyAlgorithm {
+private int processId;
+private List<Integer> processes;
+public BullyAlgorithm(int processId, List<Integer> processes) {
+this.processId = processId;
+this.processes = processes;
+}
+public int run() {
+boolean isLeader = true;
+for (int i = processId + 1; i < processes.size(); i++) {
+if (processes.get(i) > processId) {
+System.out.println("Process " + processId + " sends an election message to process" + processes.get(i));
+isLeader = false;
+}
+}
+if (!isLeader) {
+for (int i = processId + 1; i < processes.size(); i++) {
+if (processes.get(i) > processId) {
+System.out.println("Process " + processes.get(i) + " acknowledges the electionmessage from process " + processId);
+BullyAlgorithm subBully = new BullyAlgorithm(processes.get(i), processes);
+int subLeader = subBully.run();
+if (subLeader != processes.get(i)) {
+System.out.println("Process " + processes.get(i) + " forwards the leadermessage to process " + processId);
+
+return subLeader;
+}
+}
+}
+}
+System.out.println("Process " + processId + " is the leader");
+return processId;
+}
+public static void main(String[] args) {
+List<Integer> processes = new ArrayList<Integer>();
+processes.add(3);
+processes.add(7);
+processes.add(2);
+processes.add(5);
+processes.add(1);
+processes.add(9);
+BullyAlgorithm bully = new BullyAlgorithm(2, processes);
+int leader = bully.run();
+System.out.println("Leader is: " + leader);
+}
+}
+
+####################### Ring Algo #####################
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Scanner;
+public class RingAlgorithm {
+public static void main(String[] args) {
+int temp, i, j;
+List<Process> processes = new ArrayList<Process>();
+
+// scanner used for getting input from console
+Scanner in = new Scanner(System.in);
+System.out.println("Enter the number of processes: ");
+int num = in.nextInt();
+// getting input from users
+for (i = 0; i < num; i++) {
+System.out.println("Enter the id of process " + (i + 1) + ": ");
+int id = in.nextInt();
+processes.add(new Process(i, id, "active"));
+}
+// sorting the processes based on id
+Collections.sort(processes);
+System.out.println("The sorted processes are:");
+for (i = 0; i < num; i++) {
+System.out.println("[" + processes.get(i).index + "] " + processes.get(i).id);
+}
+processes.get(num - 1).state = "inactive";
+System.out.println("Process " + processes.get(num - 1).id + " selected as coordinator");
+while (true) {
+
+System.out.println("\n1. Election\n2. Quit");
+int ch = in.nextInt();
+switch (ch) {
+case 1:
+System.out.println("Enter the process number who initiates the election: ");
+int init = in.nextInt();
+int temp2 = init;
+int temp1 = (init + 1) % num;
+List<Integer> arr = new ArrayList<Integer>();
+i = 0;
+while (temp2 != temp1) {
+Process p = processes.get(temp1);
+if ("active".equals(p.state) && p.f == 0) {
+System.out.println("Process " + processes.get(init).id + " sends message toprocess " + p.id);
+p.f = 1;
+init = temp1;
+arr.add(p.id);
+i++;
+}
+temp1 = (temp1 + 1) % num;
+}
+Process p = processes.get(temp1);
+System.out.println("Process " + processes.get(init).id + " sends message to process " +p.id);
+arr.add(p.id);
+i++;
+int max = Collections.max(arr);
+System.out.println("Process " + max + " selected as coordinator");
+for (Process process : processes) {
+if (process.id == max) {
+
+process.state = "inactive";
+}
+}
+break;
+case 2:
+System.out.println("Program terminated ...");
+return;
+default:
+System.out.println("Invalid response");
+break;
+}
+}
+}
+}
+class Process implements Comparable<Process> {
+public int index; // to store the index of process
+public int id; // to store id/name of process
+public int f;
+String state; // indicates whether active or inactive state of node
+public Process(int index, int id, String state) {
+this.index = index;
+this.id = id;
+this.state = state;
+}
+@Override
+public int compareTo(Process o) {
+return Integer.compare(this.id, o.id);
+}
+}
